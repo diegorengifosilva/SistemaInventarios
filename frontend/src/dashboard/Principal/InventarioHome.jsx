@@ -1,144 +1,137 @@
 // src/dashboard/principal/InventarioHome.jsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Table from "@/components/ui/table";
-import KpiCard from "@/components/ui/KpiCard";
+import { toast } from "react-toastify";
+import { Boxes, AlertTriangle, TrendingUp, Users } from "lucide-react";
 
-import { 
-  Boxes, 
-  AlertTriangle, 
-  Ban, 
-  TrendingUp 
-} from "lucide-react";
+import { obtenerProductos } from "@/services/productoService";
+import { obtenerProveedores } from "@/services/proveedorService";
+import { obtenerTransacciones } from "@/services/transaccionService";
 
 export default function InventarioHome() {
-  const [stats, setStats] = useState({
-    totalProductos: 0,
-    stockCritico: 0,
-    productosAgotados: 0,
-    valorInventario: 0,
-  });
-
-  const [productosRecientes, setProductosRecientes] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
+  const [transacciones, setTransacciones] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const { scrollY } = useScroll();
-  const shadowOpacity = useTransform(scrollY, [0, 60], [0, 0.25]);
-  const blurValue = useTransform(scrollY, [0, 120], [4, 10]);
+  const shadowOpacity = useTransform(scrollY, [0, 50], [0, 0.25]);
+  const blurValue = useTransform(scrollY, [0, 100], [4, 8]);
 
   useEffect(() => {
-    setStats({
-      totalProductos: 120,
-      stockCritico: 8,
-      productosAgotados: 3,
-      valorInventario: 45230.5,
-    });
-
-    setProductosRecientes([
-      { id: 1, nombre: "Producto A", categoria: "Cat 1", stock: 20 },
-      { id: 2, nombre: "Producto B", categoria: "Cat 2", stock: 5 },
-      { id: 3, nombre: "Producto C", categoria: "Cat 1", stock: 0 },
-      { id: 4, nombre: "Producto D", categoria: "Cat 3", stock: 12 },
-    ]);
-
-    setLoading(false);
+    async function fetchData() {
+      try {
+        const [prods, provs, trans] = await Promise.all([
+          obtenerProductos(),
+          obtenerProveedores(),
+          obtenerTransacciones(),
+        ]);
+        setProductos(prods || []);
+        setProveedores(provs || []);
+        setTransacciones(trans || []);
+      } catch (error) {
+        console.error(error);
+        toast.error("Error cargando datos del inventario");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
   const kpis = [
-    {
-      label: "Total Productos",
-      value: stats.totalProductos,
-      icon: Boxes,
-      gradient: "linear-gradient(135deg,#3b82f6cc,#60a5fa99)",
-    },
-    {
-      label: "Stock Crítico",
-      value: stats.stockCritico,
-      icon: AlertTriangle,
-      gradient: "linear-gradient(135deg,#f59e0bcc,#fbbf2499)",
-    },
-    {
-      label: "Agotados",
-      value: stats.productosAgotados,
-      icon: Ban,
-      gradient: "linear-gradient(135deg,#ef4444cc,#f8717199)",
-    },
-    {
-      label: "Valor Inventario S/.",
-      value: stats.valorInventario.toFixed(2),
-      icon: TrendingUp,
-      gradient: "linear-gradient(135deg,#16a34acc,#4ade8099)",
-    },
+    { title: "Total Productos", value: productos.length, icon: Boxes, color: "#3b82f6" },
+    { title: "Stock Crítico (<10)", value: productos.filter(p => p.stockActual < 10).length, icon: AlertTriangle, color: "#f59e0b" },
+    { title: "Total Proveedores", value: proveedores.length, icon: Users, color: "#0ea5e9" },
+    { title: "Total Transacciones", value: transacciones.length, icon: TrendingUp, color: "#16a34a" },
   ];
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      transition={{ duration: 0.4 }}
-      className="min-h-screen w-full flex flex-col bg-gray-50"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="flex flex-col min-h-screen w-full bg-gray-50 font-sans"
     >
-      <div className="flex-1 flex flex-col px-[clamp(8px,2vw,24px)] py-[clamp(10px,3vw,28px)]">
+      {/* Contenedor scroll único */}
+      <div className="flex-1 flex flex-col py-6 px-8 w-full overflow-auto">
 
         {/* HEADER */}
         <motion.div
           style={{
-            boxShadow: shadowOpacity.get() > 0 
-              ? `0 2px 8px rgba(0,0,0,${shadowOpacity.get()})`
-              : "none",
+            boxShadow: shadowOpacity.get() > 0 ? `0 2px 8px rgba(0,0,0,${shadowOpacity.get()})` : "none",
             backdropFilter: `blur(${blurValue.get()}px)`,
           }}
-          className="sticky top-0 z-30 bg-white/80 border-b border-gray-200 rounded-2xl px-5 py-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          className="sticky top-0 z-30 bg-white/90 border-b border-gray-200 rounded-2xl shadow-md px-6 py-3 mb-6 flex flex-col gap-2"
         >
-          <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-[clamp(1.3rem,2.5vw,2.2rem)] flex items-center gap-3">
-              📦 Inventario General
-            </h1>
-            <p className="text-gray-600 italic text-[clamp(0.8rem,1vw,1rem)]">
-              Estado actual del inventario y movimientos recientes
-            </p>
-          </div>
+          <motion.h1 className="font-bold text-2xl flex items-center gap-2">📦 Dashboard Inventario</motion.h1>
+          <motion.p className="text-gray-600 italic text-sm">
+            Resumen de <span className="font-semibold text-blue-600">productos, proveedores y transacciones</span>.
+          </motion.p>
         </motion.div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {kpis.map((kpi, i) => (
-            <motion.div key={i} whileHover={{ scale: 1.02 }}>
-              <KpiCard
-                label={kpi.label}
-                value={loading ? 0 : kpi.value}
-                icon={kpi.icon}
-                gradient={kpi.gradient}
-              />
+        <div className="flex gap-4 mb-6 w-full">
+          {kpis.map((kpi, idx) => (
+            <motion.div
+              key={idx}
+              whileHover={{ scale: 1.02 }}
+              className="flex-1 flex flex-col items-center justify-center text-white p-4 rounded-xl shadow-sm"
+              style={{ background: `linear-gradient(135deg, ${kpi.color}cc, ${kpi.color}99)` }}
+            >
+              <kpi.icon className="w-6 h-6 mb-1 opacity-90" />
+              <p className="text-sm font-medium">{kpi.title}</p>
+              <p className="text-xl font-bold mt-1">{Number(kpi.value).toLocaleString()}</p>
             </motion.div>
           ))}
         </div>
 
         {/* TABLAS */}
-        <div className="grid grid-cols-1 gap-6">
+        <div className="flex flex-col gap-6 w-full">
 
-          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6">
-            <h2 className="font-semibold text-gray-700 mb-4 text-lg">
-              Productos Recientes
-            </h2>
-
+          {/* Productos */}
+          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 w-full" style={{ minHeight: "clamp(150px, 25vh, 300px)" }}>
+            <h2 className="font-semibold text-gray-700 mb-2 text-lg">Productos Recientes</h2>
             <Table
-              headers={["ID", "Nombre", "Categoría", "Stock"]}
-              data={productosRecientes}
+              headers={["Código", "Nombre", "Stock", "Proveedor"]}
+              data={productos.slice(-5)}
               renderRow={(p) => [
-                <span>{p.id}</span>,
-                <span>{p.nombre}</span>,
-                <span>{p.categoria}</span>,
-                <span className={p.stock === 0 ? "text-red-600 font-semibold" : ""}>
-                  {p.stock}
-                </span>,
+                p.codigo,
+                p.nombre,
+                <span className={p.stockActual < 10 ? "text-red-600 font-semibold" : ""}>{p.stockActual}</span>,
+                p.rucProveedor,
               ]}
               rowsPerPage={5}
             />
           </div>
 
-          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 h-64 flex items-center justify-center text-gray-400 italic">
-            Gráfico de movimientos — pendiente de implementación
+          {/* Proveedores */}
+          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 w-full" style={{ minHeight: "clamp(150px, 25vh, 300px)" }}>
+            <h2 className="font-semibold text-gray-700 mb-2 text-lg">Proveedores Recientes</h2>
+            <Table
+              headers={["RUC", "Razón Social", "Contacto"]}
+              data={proveedores.slice(-5)}
+              renderRow={(p) => [p.ruc, p.razonSocial, p.contacto || "-"]}
+              rowsPerPage={5}
+            />
+          </div>
+
+          {/* Transacciones */}
+          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 w-full" style={{ minHeight: "clamp(150px, 25vh, 300px)" }}>
+            <h2 className="font-semibold text-gray-700 mb-2 text-lg">Últimas Transacciones</h2>
+            <Table
+              headers={["ID", "Tipo", "Producto", "Cantidad", "Fecha"]}
+              data={transacciones.slice(-5)}
+              renderRow={(t) => [
+                t.idTransaccion,
+                t.tipo,
+                t.producto?.nombre || "-",
+                t.cantidad,
+                new Date(t.fecha).toLocaleString(),
+              ]}
+              rowsPerPage={5}
+            />
           </div>
 
         </div>

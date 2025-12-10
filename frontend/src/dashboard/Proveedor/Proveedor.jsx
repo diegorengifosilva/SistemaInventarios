@@ -1,13 +1,13 @@
-// C:\Users\diego\PROYECTOS\PROYECTO_INVENTARIO\frontend\src\dashboard\Proveedor\Proveedor.jsx
+// src/dashboard/Proveedor/Proveedor.jsx
 import React, { useEffect, useState } from "react";
 import {
   Box,
   Search,
-  Plus,
   Users,
   BriefcaseBusiness,
   Eye,
   AlertTriangle,
+  Plus
 } from "lucide-react";
 
 import Table from "@/components/ui/table";
@@ -23,7 +23,11 @@ import NuevoProveedor from "../Productos/NuevoProveedor";
 export default function Proveedor() {
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [filtro, setFiltro] = useState("");
+  const [filtroAvanzado, setFiltroAvanzado] = useState({
+    ruc: "",
+    razonSocial: "",
+    conProductos: "",
+  });
   const [modalData, setModalData] = useState(null);
   const [openModal, setOpenModal] = useState(false);
 
@@ -48,24 +52,23 @@ export default function Proveedor() {
     productos: productos.filter((prod) => prod.proveedor?.ruc === p.ruc),
   }));
 
-  // Filtro simple
-  const filtrados = proveedoresConConteo.filter(
-    (p) =>
-      p.razonSocial.toLowerCase().includes(filtro.toLowerCase()) ||
-      p.ruc.toLowerCase().includes(filtro.toLowerCase())
-  );
+  // ==== Filtrado Inteligente ====
+  const filtrados = proveedoresConConteo.filter((p) => {
+    let cumple = true;
 
-  // Función eliminar (opcional)
-  const handleEliminar = async (ruc) => {
-    if (!window.confirm("¿Desea eliminar este proveedor?")) return;
-    const ok = await eliminarProveedor(ruc);
-    if (ok) {
-      toast.success("Proveedor eliminado");
-      setProveedores(proveedores.filter((p) => p.ruc !== ruc));
-    } else {
-      toast.error("No se pudo eliminar el proveedor");
-    }
-  };
+    if (filtroAvanzado.ruc)
+      cumple = cumple && p.ruc.includes(filtroAvanzado.ruc);
+
+    if (filtroAvanzado.razonSocial)
+      cumple = cumple && p.razonSocial.toLowerCase().includes(filtroAvanzado.razonSocial.toLowerCase());
+
+    if (filtroAvanzado.conProductos === "con")
+      cumple = cumple && p.productos.length > 0;
+    else if (filtroAvanzado.conProductos === "sin")
+      cumple = cumple && p.productos.length === 0;
+
+    return cumple;
+  });
 
   return (
     <motion.div
@@ -78,7 +81,8 @@ export default function Proveedor() {
         {/* HEADER */}
         <motion.div
           style={{
-            boxShadow: shadowOpacity.get() > 0 ? `0 2px 8px rgba(0,0,0,${shadowOpacity.get()})` : "none",
+            boxShadow:
+              shadowOpacity.get() > 0 ? `0 2px 8px rgba(0,0,0,${shadowOpacity.get()})` : "none",
             backdropFilter: `blur(${blurValue.get()}px)`,
           }}
           className="sticky top-0 z-30 bg-white/90 border-b border-gray-200 rounded-2xl shadow-md px-5 py-3 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
@@ -108,32 +112,15 @@ export default function Proveedor() {
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 w-full">
           {[
-            {
-              title: "Total Proveedores",
-              value: proveedores.length,
-              icon: Users,
-              color: "#3b82f6",
-            },
-            {
-              title: "Con Productos",
-              value: proveedoresConConteo.filter((p) => p.productos.length > 0).length,
-              icon: Box,
-              color: "#0ea5e9",
-            },
-            {
-              title: "Sin Productos",
-              value: proveedoresConConteo.filter((p) => p.productos.length === 0).length,
-              icon: AlertTriangle,
-              color: "#eab308",
-            },
+            { title: "Total Proveedores", value: proveedores.length, icon: Users, color: "#3b82f6" },
+            { title: "Con Productos", value: proveedoresConConteo.filter(p => p.productos.length > 0).length, icon: Box, color: "#0ea5e9" },
+            { title: "Sin Productos", value: proveedoresConConteo.filter(p => p.productos.length === 0).length, icon: AlertTriangle, color: "#eab308" },
           ].map((kpi, idx) => (
             <motion.div
               key={idx}
               whileHover={{ scale: 1.02 }}
               className="flex flex-col items-center justify-center text-white p-5 rounded-xl shadow-sm"
-              style={{
-                background: `linear-gradient(135deg, ${kpi.color}cc, ${kpi.color}99)`,
-              }}
+              style={{ background: `linear-gradient(135deg, ${kpi.color}cc, ${kpi.color}99)` }}
             >
               <kpi.icon className="w-8 h-8 mb-2 opacity-90" />
               <p className="text-sm font-medium">{kpi.title}</p>
@@ -142,22 +129,49 @@ export default function Proveedor() {
           ))}
         </div>
 
-        {/* Buscador */}
-        <div className="w-full mb-4 flex flex-wrap gap-2 items-center">
-          <div className="flex items-center w-full md:w-1/3 border rounded-xl px-3 py-2 bg-gray-50">
-            <Search className="text-gray-500 w-5" />
+        {/* Filtros avanzados PC */}
+        <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl p-4 shadow-sm w-full max-w-5xl mb-4">
+          {/* RUC */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">RUC</label>
             <input
               type="text"
-              placeholder="Buscar por nombre o RUC..."
-              className="bg-transparent outline-none px-2 w-full"
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
+              placeholder="Buscar RUC..."
+              className="border border-gray-300 rounded-xl px-3 py-2 w-36 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              value={filtroAvanzado.ruc}
+              onChange={(e) => setFiltroAvanzado({ ...filtroAvanzado, ruc: e.target.value })}
             />
+          </div>
+
+          {/* Razón Social */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">Razón Social</label>
+            <input
+              type="text"
+              placeholder="Buscar razón social..."
+              className="border border-gray-300 rounded-xl px-3 py-2 w-36 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              value={filtroAvanzado.razonSocial}
+              onChange={(e) => setFiltroAvanzado({ ...filtroAvanzado, razonSocial: e.target.value })}
+            />
+          </div>
+
+          {/* Con/Sin productos */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">Productos</label>
+            <select
+              className="border border-gray-300 rounded-xl px-3 py-2 w-36 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+              value={filtroAvanzado.conProductos}
+              onChange={(e) => setFiltroAvanzado({ ...filtroAvanzado, conProductos: e.target.value })}
+            >
+              <option value="">Todos</option>
+              <option value="con">Con productos</option>
+              <option value="sin">Sin productos</option>
+            </select>
           </div>
         </div>
 
         {/* Tabla */}
-        <div className="hidden md:block w-full flex-1 overflow-auto">
+        <div className="w-full flex-1 overflow-auto">
           <Table
             headers={["RUC", "Razón Social", "Contacto", "# Productos", "Acciones"]}
             data={filtrados}
@@ -188,17 +202,14 @@ export default function Proveedor() {
         )}
 
         <NuevoProveedor
-        open={openModal}
-        onClick={() => setOpenModal(true)}
-        onClose={() => setOpenModal(false)}
-        onSave={async (proveedor) => {
-            // Aquí 'proveedor' ya viene del modal recién creado
+          open={openModal}
+          onClick={() => setOpenModal(true)}
+          onClose={() => setOpenModal(false)}
+          onSave={async (proveedor) => {
             toast.success("Proveedor creado correctamente");
-
-            // Recargar lista de proveedores desde el backend
             const data = await obtenerProveedores();
             setProveedores(data || []);
-        }}
+          }}
         />
       </div>
     </motion.div>

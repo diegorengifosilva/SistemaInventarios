@@ -4,11 +4,7 @@ import {
   Box,
   TrendingUp,
   Search,
-  Plus,
-  Filter,
   Eye,
-  Pencil,
-  Trash2,
   AlertTriangle,
   DollarSign,
   Users,
@@ -16,7 +12,6 @@ import {
   FilePlus,
 } from "lucide-react";
 
-import KpiCard from "@/components/ui/KpiCard";
 import Table from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-toastify";
@@ -28,6 +23,14 @@ import NuevoProducto from "./NuevoProducto";
 export default function Productos() {
   const [productos, setProductos] = useState([]);
   const [filtro, setFiltro] = useState("");
+  const [filtroAvanzado, setFiltroAvanzado] = useState({
+    codigo: "",
+    nombre: "",
+    stockMin: "",
+    stockMax: "",
+    categoria: "",
+  });
+
   const [modalData, setModalData] = useState(null);
   const [openModal, setOpenModal] = useState(false);
 
@@ -46,32 +49,36 @@ export default function Productos() {
 
   // ==== KPIs ====
   const totalProductos = productos.length;
-
-  const productosActivos = productos.filter(
-    (p) => p.stockActual > 0
-  ).length;
-
+  const productosActivos = productos.filter((p) => p.stockActual > 0).length;
   const productosBajoMinimo = productos.filter(
     (p) => p.stockActual <= (p.stockMinimo || 0)
   ).length;
-
   const stockValorizado = productos.reduce(
     (sum, p) => sum + p.stockActual * p.precioUnitario,
     0
   );
-
   const proveedoresActivos = new Set(
-    productos
-      .map((p) => p.proveedorId || p.proveedor?.id)
-      .filter(Boolean)
+    productos.map((p) => p.proveedorId || p.proveedor?.id).filter(Boolean)
   ).size;
 
-  // Filtro simple
-  const filtrados = productos.filter(
-    (p) =>
-      p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
-      p.codigo.toLowerCase().includes(filtro.toLowerCase())
-  );
+  // ==== Filtrado Inteligente ====
+  const filtrados = productos.filter((p) => {
+    const busqueda = filtro.toLowerCase();
+
+    // Verifica búsqueda principal + filtros avanzados
+    const cumpleBusqueda =
+      (!busqueda || p.nombre.toLowerCase().includes(busqueda) || p.codigo.toLowerCase().includes(busqueda)) &&
+      (!filtroAvanzado.codigo || p.codigo.toLowerCase().includes(filtroAvanzado.codigo.toLowerCase())) &&
+      (!filtroAvanzado.nombre || p.nombre.toLowerCase().includes(filtroAvanzado.nombre.toLowerCase())) &&
+      (!filtroAvanzado.stockMin || p.stockActual >= Number(filtroAvanzado.stockMin)) &&
+      (!filtroAvanzado.stockMax || p.stockActual <= Number(filtroAvanzado.stockMax)) &&
+      (!filtroAvanzado.categoria || p.categoria === filtroAvanzado.categoria);
+
+    return cumpleBusqueda;
+  });
+
+  // Categorías únicas para el filtro
+  const categoriasUnicas = [...new Set(productos.map((p) => p.categoria))].filter(Boolean);
 
   return (
     <motion.div
@@ -80,33 +87,29 @@ export default function Productos() {
       transition={{ duration: 0.5 }}
       className="min-h-screen w-full flex flex-col bg-gray-50 font-sans"
     >
-      <div className="flex-1 flex flex-col py-[clamp(8px,2vw,24px)] px-[clamp(8px,2vw,24px)]">
+      <div className="flex-1 flex flex-col py-6 px-6 overflow-auto">
         {/* HEADER */}
         <motion.div
           style={{
-            boxShadow: shadowOpacity.get() > 0 ? `0 2px 8px rgba(0,0,0,${shadowOpacity.get()})` : "none",
+            boxShadow:
+              shadowOpacity.get() > 0
+                ? `0 2px 8px rgba(0,0,0,${shadowOpacity.get()})`
+                : "none",
             backdropFilter: `blur(${blurValue.get()}px)`,
           }}
-          className="sticky top-0 z-30 bg-white/90 border-b border-gray-200 rounded-2xl shadow-md px-[clamp(12px,2vw,20px)] py-[clamp(8px,1.2vw,12px)] mb-[clamp(10px,2vw,16px)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[clamp(8px,1.5vw,12px)]"
+          className="sticky top-0 z-30 bg-white/90 border-b border-gray-200 rounded-2xl shadow-md px-6 py-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
         >
           <div className="flex-1 min-w-0">
-            <motion.h1
-              className="font-bold flex items-center gap-3 truncate"
-              style={{ fontSize: "clamp(1rem,2.2vw,2rem)" }}
-            >
-              <BriefcaseBusiness className="w-[clamp(20px,3vw,30px)] h-[clamp(20px,3vw,30px)] text-gray-900" />
+            <motion.h1 className="font-bold flex items-center gap-3 truncate text-xl sm:text-2xl">
+              <BriefcaseBusiness className="w-6 h-6 text-gray-900" />
               Gestión de Productos
             </motion.h1>
-            <motion.p
-              className="mt-1 text-gray-600 italic truncate"
-              style={{ fontSize: "clamp(0.7rem,0.9vw,1rem)" }}
-            >
+            <motion.p className="mt-1 text-gray-600 italic truncate text-sm sm:text-base">
               Gestión de <span className="font-semibold text-blue-600">productos</span>.
             </motion.p>
           </div>
 
-          {/* BOTÓN NUEVA COTIZACIÓN */}
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-end mt-2 sm:mt-0">
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 onClick={() => setOpenModal("nueva")}
@@ -118,39 +121,14 @@ export default function Productos() {
           </div>
         </motion.div>
 
-        {/* KPIS */}
+        {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-6 w-full">
           {[
-            {
-              title: "Total Productos",
-              value: totalProductos,
-              icon: Box,
-              color: "#3b82f6",
-            },
-            {
-              title: "Productos Activos",
-              value: productosActivos,
-              icon: TrendingUp,
-              color: "#0ea5e9",
-            },
-            {
-              title: "Bajo Stock Mínimo",
-              value: productosBajoMinimo,
-              icon: AlertTriangle,
-              color: "#eab308",
-            },
-            {
-              title: "Stock Valorizado (S/.)",
-              value: parseFloat(stockValorizado).toFixed(2),
-              icon: DollarSign,
-              color: "#14b8a6",
-            },
-            {
-              title: "Proveedores Activos",
-              value: proveedoresActivos,
-              icon: Users,
-              color: "#7c3aed",
-            },
+            { title: "Total Productos", value: totalProductos, icon: Box, color: "#3b82f6" },
+            { title: "Productos Activos", value: productosActivos, icon: TrendingUp, color: "#0ea5e9" },
+            { title: "Bajo Stock Mínimo", value: productosBajoMinimo, icon: AlertTriangle, color: "#eab308" },
+            { title: "Stock Valorizado (S/.)", value: parseFloat(stockValorizado).toFixed(2), icon: DollarSign, color: "#14b8a6" },
+            { title: "Proveedores Activos", value: proveedoresActivos, icon: Users, color: "#7c3aed" },
           ].map((kpi, idx) => (
             <motion.div
               key={idx}
@@ -160,29 +138,17 @@ export default function Productos() {
                 background: `linear-gradient(135deg, ${kpi.color}cc, ${kpi.color}99)`,
               }}
             >
-              {/* ICON */}
               <kpi.icon className="w-8 h-8 mb-2 opacity-90" />
-
-              {/* LABEL */}
               <p className="text-sm font-medium">{kpi.title}</p>
-
-              {/* VALUE */}
-              <p className="text-2xl font-bold mt-1">
-                {Number(kpi.value).toLocaleString()}
-              </p>
-
-              {/* PROGRESS BAR */}
+              <p className="text-2xl font-bold mt-1">{Number(kpi.value).toLocaleString()}</p>
               <div className="w-full h-2 bg-white bg-opacity-30 rounded-full mt-2">
                 <div
                   className="h-2 rounded-full"
                   style={{
-                    width: `${
-                      Math.min(
-                        (Number(kpi.value) /
-                          (totalProductos || productosActivos || 1)) * 100,
-                        100
-                      )
-                    }%`,
+                    width: `${Math.min(
+                      (Number(kpi.value) / (totalProductos || 1)) * 100,
+                      100
+                    )}%`,
                     backgroundColor: kpi.color,
                   }}
                 />
@@ -191,28 +157,86 @@ export default function Productos() {
           ))}
         </div>
 
-        {/* FILTROS */}
-        <div className="w-full mb-4">
-          
-          {/* Buscador */}
-          <div className="flex items-center w-full md:w-1/3 border rounded-xl px-3 py-2 bg-gray-50">
-            <Search className="text-gray-500 w-5" />
+        {/* Filtros avanzados PC */}
+        <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl p-4 shadow-sm w-full max-w-5xl">
+          {/* Código */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">Código</label>
             <input
               type="text"
-              placeholder="Buscar por nombre o código..."
-              className="bg-transparent outline-none px-2 w-full"
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
+              placeholder="Buscar código..."
+              className="border border-gray-300 rounded-xl px-3 py-2 w-36 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              value={filtroAvanzado.codigo}
+              onChange={(e) =>
+                setFiltroAvanzado({ ...filtroAvanzado, codigo: e.target.value })
+              }
             />
           </div>
 
-          <button className="flex items-center gap-2 border px-3 py-2 rounded-xl hover:bg-gray-100">
-            <Filter className="w-4" /> Filtros Avanzados (Próx.)
-          </button>
+          {/* Nombre */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">Nombre</label>
+            <input
+              type="text"
+              placeholder="Buscar nombre..."
+              className="border border-gray-300 rounded-xl px-3 py-2 w-36 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              value={filtroAvanzado.nombre}
+              onChange={(e) =>
+                setFiltroAvanzado({ ...filtroAvanzado, nombre: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Stock mínimo */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">Stock Mínimo</label>
+            <input
+              type="number"
+              placeholder="0"
+              className="border border-gray-300 rounded-xl px-3 py-2 w-36 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              value={filtroAvanzado.stockMin}
+              onChange={(e) =>
+                setFiltroAvanzado({ ...filtroAvanzado, stockMin: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Stock máximo */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">Stock Máximo</label>
+            <input
+              type="number"
+              placeholder="100"
+              className="border border-gray-300 rounded-xl px-3 py-2 w-36 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              value={filtroAvanzado.stockMax}
+              onChange={(e) =>
+                setFiltroAvanzado({ ...filtroAvanzado, stockMax: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Categoría */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 text-sm mb-1">Categoría</label>
+            <select
+              className="border border-gray-300 rounded-xl px-3 py-2 w-44 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+              value={filtroAvanzado.categoria}
+              onChange={(e) =>
+                setFiltroAvanzado({ ...filtroAvanzado, categoria: e.target.value })
+              }
+            >
+              <option value="">Todas Categorías</option>
+              {categoriasUnicas.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* TABLA */}
-        <div className="hidden md:block w-full flex-1 overflow-auto">
+        <div className="w-full flex-1 mt-4">
           <Table
             headers={["Código", "Nombre", "Stock", "Precio", "Categoría", "Acciones"]}
             data={filtrados}
@@ -222,7 +246,6 @@ export default function Productos() {
               p.stockActual,
               `S/ ${p.precioUnitario.toFixed(2)}`,
               p.categoria || "—",
-
               <div className="flex gap-2 justify-center">
                 <button
                   className="p-2 rounded-lg bg-blue-100 hover:bg-blue-200"
@@ -235,7 +258,7 @@ export default function Productos() {
           />
         </div>
 
-        {/* MODAL DETALLES */}
+        {/* MODALES */}
         {modalData && (
           <ProductoDetalleModal
             producto={modalData}
@@ -249,11 +272,8 @@ export default function Productos() {
           onClose={() => setOpenModal(false)}
           onSave={async (producto) => {
             const ok = await crearProducto(producto);
-
             if (ok) {
               toast.success("Producto creado correctamente");
-
-              // Recargar lista
               const data = await obtenerProductos();
               setProductos(data || []);
             } else {
